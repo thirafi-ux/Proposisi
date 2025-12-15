@@ -1,0 +1,189 @@
+/* Import Bootstrap */
+@import 'bootstrap/dist/css/bootstrap.min.css';
+@import '@mdi/font/css/materialdesignicons.min.css';
+
+/* Custom variables */
+:root {
+    --proposition-primary: #4361ee;
+    --proposition-secondary: #3a0ca3;
+    --proposition-success: #4cc9f0;
+    --proposition-warning: #f8961e;
+    --proposition-danger: #f72585;
+    --proposition-dark: #1a1a2e;
+    --proposition-light: #f8f9fa;
+    
+    /* Glass morphism */
+    --glass-bg: rgba(255, 255, 255, 0.9);
+    --glass-border: rgba(255, 255, 255, 0.2);
+    --glass-shadow: 0 8px 32px rgba(31, 38, 135, 0.1);
+}
+
+[data-bs-theme="dark"] {
+    --proposition-primary: #5a7dfe;
+    --proposition-secondary: #4d26ca;
+    --proposition-dark: #f8f9fa;
+    --proposition-light: #1a1a2e;
+    
+    --glass-bg: rgba(26, 26, 46, 0.9);
+    --glass-border: rgba(255, 255, 255, 0.1);
+    --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+/* Base styles */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, var(--proposition-light) 0%, var(--proposition-dark) 100%);
+    min-height: 100vh;
+    transition: background 0.3s ease;
+}
+
+/* Glass card effect */
+.card-glass {
+    background: var(--glass-bg);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
+    border-radius: 16px;
+}
+
+/* Input styling */
+.expression-input {
+    font-family: 'Courier New', monospace;
+    font-size: 1.25rem;
+    background: var(--glass-bg);
+    border: 2px solid var(--proposition-primary);
+    transition: all 0.3s ease;
+}
+
+.expression-input:focus {
+    box-shadow: 0 0 0 0.25rem rgba(67, 97, 238, 0.25);
+    border-color: var(--proposition-secondary);
+}
+
+/* Operator buttons */
+.logic-operator {
+    background: linear-gradient(45deg, var(--proposition-primary), var(--proposition-secondary));
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 60px;
+}
+
+.logic-operator:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(67, 97, 238, 0.3);
+}
+
+/* Truth table */
+.truth-table-container {
+    overflow-x: auto;
+    border-radius: 10px;
+    background: white;
+}
+
+.truth-table {
+    min-width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    margin: 0;
+}
+
+.truth-table th {
+    background: var(--proposition-primary);
+    color: white;
+    padding: 1rem;
+    font-weight: 600;
+    text-align: center;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.truth-table td {
+    padding: 0.75rem 1rem;
+    text-align: center;
+    border-bottom: 1px solid #dee2e6;
+    font-family: 'Courier New', monospace;
+}
+
+.truth-table tr:nth-child(even) {
+    background-color: rgba(67, 97, 238, 0.05);
+}
+
+.result-true {
+    background-color: rgba(76, 201, 240, 0.2) !important;
+    color: #155724;
+    font-weight: bold;
+}
+
+.result-false {
+    background-color: rgba(247, 37, 133, 0.2) !important;
+    color: #721c24;
+    font-weight: bold;
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.fade-in {
+    animation: fadeIn 0.5s ease-in-out;
+}
+
+.slide-in {
+    animation: slideIn 0.3s ease-out;
+}
+
+/* Loading overlay */
+#loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(5px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .expression-input {
+        font-size: 1rem;
+    }
+    
+    .logic-operator {
+        min-width: 50px;
+        padding: 0.4rem 0.8rem;
+        font-size: 0.9rem;
+    }
+    
+    .truth-table th,
+    .truth-table td {
+        padding: 0.5rem;
+        font-size: 0.9rem;
+    }
+}
