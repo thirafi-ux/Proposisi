@@ -5,7 +5,7 @@ namespace App\Services;
 class TruthTableService
 {
     private $parser;
-    
+
     public function __construct()
     {
         $this->parser = new PropositionParserService();
@@ -20,39 +20,50 @@ class TruthTableService
         $parsed = $this->parser->parse($expression);
         $ast = $parsed['ast'];
         $variables = $parsed['variables'];
-        
+
         // Extract all sub-expressions from AST with proper ordering
         $subExpressions = $this->extractAllSubExpressions($ast);
-        
-        // Sort sub-expressions by complexity (simple to complex)
+
+        // Sort sub-expressions by complexity and type for better ordering
         usort($subExpressions, function($a, $b) {
-            return $this->getExpressionComplexity($a) - $this->getExpressionComplexity($b);
+            $complexityA = $this->getExpressionComplexity($a);
+            $complexityB = $this->getExpressionComplexity($b);
+
+            // If same complexity, prioritize non-negated expressions
+            if ($complexityA === $complexityB) {
+                $isNegatedA = strpos($a, '¬') === 0;
+                $isNegatedB = strpos($b, '¬') === 0;
+                if ($isNegatedA && !$isNegatedB) return 1;
+                if (!$isNegatedA && $isNegatedB) return -1;
+            }
+
+            return $complexityA - $complexityB;
         });
-        
+
         // Add main expression at the end if not already present
         $mainExpr = $this->astToString($ast);
         if (!in_array($mainExpr, $subExpressions)) {
             $subExpressions[] = $mainExpr;
         }
-        
+
         // Get all expressions to display
         $allExpressions = array_merge($variables, $subExpressions);
-        
+
         $totalRows = pow(2, count($variables));
         $table = [];
-        
-        // Generate all possible combinations
-        for ($i = 0; $i < $totalRows; $i++) {
+
+        // Generate all possible combinations (starting from all TRUE)
+        for ($i = $totalRows - 1; $i >= 0; $i--) {
             $row = [];
             $values = [];
-            
-            // Assign binary values to variables
+
+            // Assign binary values to variables (reversed order for TRUE first)
             foreach ($variables as $index => $var) {
                 $value = ($i >> (count($variables) - $index - 1)) & 1;
                 $row[$var] = (bool)$value;
                 $values[$var] = (bool)$value;
             }
-            
+
             // Evaluate all sub-expressions
             foreach ($subExpressions as $expr) {
                 // Parse the sub-expression
@@ -64,10 +75,10 @@ class TruthTableService
                     $row[$expr] = false;
                 }
             }
-            
+
             $table[] = $row;
         }
-        
+
         // Convert boolean to B/S (Benar/Salah) and format table
         $formattedTable = [];
         foreach ($table as $row) {
@@ -77,7 +88,7 @@ class TruthTableService
             }
             $formattedTable[] = $formattedRow;
         }
-        
+
         // Count results for main expression
         $mainExpr = $this->astToString($ast);
         $trueCount = 0;
@@ -86,7 +97,7 @@ class TruthTableService
                 $trueCount++;
             }
         }
-        
+
         return [
             'table' => $formattedTable,
             'headers' => $allExpressions,
@@ -100,7 +111,7 @@ class TruthTableService
             'main_expression' => $mainExpr
         ];
     }
-    
+
     /**
      * Extract all sub-expressions from AST in post-order
      */
@@ -109,23 +120,23 @@ class TruthTableService
         if ($ast['type'] === 'variable') {
             return $expressions;
         }
-        
+
         // First process operands
         foreach ($ast['operands'] as $operand) {
             $this->extractAllSubExpressions($operand, $expressions);
         }
-        
+
         // Then process current node
         $exprString = $this->astToString($ast);
-        
+
         // Add to expressions if not already present
         if (!in_array($exprString, $expressions)) {
             $expressions[] = $exprString;
         }
-        
+
         return $expressions;
     }
-    
+
     /**
      * Get complexity score of expression (number of operators)
      */
@@ -133,14 +144,14 @@ class TruthTableService
     {
         $operators = ['¬', '∧', '∨', '→', '↔', '⊕'];
         $complexity = 0;
-        
+
         foreach ($operators as $op) {
             $complexity += substr_count($expression, $op);
         }
-        
+
         return $complexity;
     }
-    
+
     /**
      * Convert AST to string representation
      */
@@ -149,21 +160,40 @@ class TruthTableService
         if ($ast['type'] === 'variable') {
             return $ast['value'];
         }
-        
+
         $operator = $ast['operator'];
         $operands = $ast['operands'];
-        
+
         if ($operator === '¬') {
-            return '¬' . $this->astToString($operands[0]);
+            $operand = $operands[0];
+            // Add parentheses for negation of compound expressions
+            if ($operand['type'] === 'operator') {
+                return '¬(' . $this->astToString($operand) . ')';
+            }
+            return '¬' . $this->astToString($operand);
         }
-        
+
         $left = $this->astToString($operands[0]);
         $right = $this->astToString($operands[1]);
-        
-        // Remove unnecessary outer parentheses for cleaner display
+
+        // Add parentheses around operands based on precedence
+        $precedence = ['¬' => 4, '∧' => 3, '∨' => 2, '⊕' => 2, '→' => 1, '↔' => 1];
+
+        // Left operand needs parentheses if it has lower precedence
+        if ($operands[0]['type'] === 'operator' &&
+            $precedence[$operands[0]['operator']] < $precedence[$operator]) {
+            $left = '(' . $left . ')';
+        }
+
+        // Right operand needs parentheses if it has lower OR EQUAL precedence (for clarity)
+        if ($operands[1]['type'] === 'operator' &&
+            $precedence[$operands[1]['operator']] <= $precedence[$operator]) {
+            $right = '(' . $right . ')';
+        }
+
         return $left . ' ' . $operator . ' ' . $right;
     }
-    
+
     /**
      * Generate basic truth table
      */
@@ -175,30 +205,30 @@ class TruthTableService
             $ast = $parsed['ast'];
             $variables = $parsed['variables'];
         }
-        
+
         $totalRows = pow(2, count($variables));
         $table = [];
-        
+
         // Generate all possible combinations
         for ($i = 0; $i < $totalRows; $i++) {
             $row = [];
             $values = [];
-            
+
             // Assign binary values to variables
             foreach ($variables as $index => $var) {
                 $value = ($i >> (count($variables) - $index - 1)) & 1;
                 $row[$var] = (bool)$value;
                 $values[$var] = (bool)$value;
             }
-            
+
             // Evaluate the expression
             $row['Hasil'] = $this->evaluateAST($ast, $values);
             $table[] = $row;
         }
-        
+
         $trueCount = $this->countTrue($table);
         $falseCount = count($table) - $trueCount;
-        
+
         return [
             'table' => $table,
             'headers' => array_merge($variables, ['Hasil']),
@@ -212,7 +242,7 @@ class TruthTableService
             'row_count' => count($table)
         ];
     }
-    
+
     /**
      * Generate truth table with step-by-step evaluation
      */
@@ -220,7 +250,7 @@ class TruthTableService
     {
         $tableData = $this->generate($ast, $variables);
         $allSteps = [];
-        
+
         foreach ($tableData['table'] as $rowIndex => $row) {
             list($steps, $result) = $this->evaluateASTWithSteps($ast, $row);
             $allSteps[] = [
@@ -230,7 +260,7 @@ class TruthTableService
                 'steps' => $steps
             ];
         }
-        
+
         return [
             'table' => $tableData['table'],
             'all_steps' => $allSteps,
@@ -244,7 +274,7 @@ class TruthTableService
             ]
         ];
     }
-    
+
     /**
      * Evaluate expression with custom values
      */
@@ -252,16 +282,16 @@ class TruthTableService
     {
         // Prepare values array for evaluation
         $values = [];
-        
+
         // Extract variables from AST
         $variables = $this->extractVariablesFromAST($ast);
         foreach ($variables as $var) {
             $values[$var] = $customValues[$var] ?? false;
         }
-        
+
         // Evaluate the expression
         list($steps, $result) = $this->evaluateASTWithSteps($ast, $values);
-        
+
         return [
             'steps' => $steps,
             'final_result_text' => $result ? 'True' : 'False',
@@ -269,7 +299,7 @@ class TruthTableService
             'values' => $values
         ];
     }
-    
+
     /**
      * Evaluate AST with given values
      */
@@ -278,40 +308,40 @@ class TruthTableService
         if ($ast['type'] === 'variable') {
             return $values[$ast['value']] ?? false;
         }
-        
+
         $operator = $ast['operator'];
         $operands = $ast['operands'];
-        
+
         switch ($operator) {
             case '¬':
                 return !$this->evaluateAST($operands[0], $values);
             case '∧':
-                return $this->evaluateAST($operands[0], $values) && 
+                return $this->evaluateAST($operands[0], $values) &&
                        $this->evaluateAST($operands[1], $values);
             case '∨':
-                return $this->evaluateAST($operands[0], $values) || 
+                return $this->evaluateAST($operands[0], $values) ||
                        $this->evaluateAST($operands[1], $values);
             case '→':
-                return !$this->evaluateAST($operands[0], $values) || 
+                return !$this->evaluateAST($operands[0], $values) ||
                        $this->evaluateAST($operands[1], $values);
             case '↔':
-                return $this->evaluateAST($operands[0], $values) === 
+                return $this->evaluateAST($operands[0], $values) ===
                        $this->evaluateAST($operands[1], $values);
             case '⊕':
-                return $this->evaluateAST($operands[0], $values) !== 
+                return $this->evaluateAST($operands[0], $values) !==
                        $this->evaluateAST($operands[1], $values);
             default:
                 return false;
         }
     }
-    
+
     /**
      * Evaluate AST with step-by-step tracking
      */
     private function evaluateASTWithSteps($ast, $values, $depth = 1)
     {
         $steps = [];
-        
+
         if ($ast['type'] === 'variable') {
             $value = $values[$ast['value']] ?? false;
             $steps[] = [
@@ -322,21 +352,21 @@ class TruthTableService
             ];
             return [$steps, $value];
         }
-        
+
         $operator = $ast['operator'];
         $operands = $ast['operands'];
-        
+
         // Evaluate operands
         $operandResults = [];
         $currentStep = $depth;
-        
+
         foreach ($operands as $operand) {
             list($operandSteps, $operandValue) = $this->evaluateASTWithSteps($operand, $values, $currentStep);
             $steps = array_merge($steps, $operandSteps);
             $operandResults[] = $operandValue;
             $currentStep = $depth + count($steps);
         }
-        
+
         // Apply operator
         $operatorNames = [
             '¬' => 'Negasi (BUKAN)',
@@ -346,12 +376,12 @@ class TruthTableService
             '↔' => 'Bikondisional (JIKA-HANYA-JIKA)',
             '⊕' => 'XOR (Exclusive OR)'
         ];
-        
+
         $operatorName = $operatorNames[$operator] ?? $operator;
-        
+
         // Format values for display
         $formatValue = function($val) { return $val ? 'B' : 'S'; };
-        
+
         switch ($operator) {
             case '¬':
                 $result = !$operandResults[0];
@@ -388,35 +418,35 @@ class TruthTableService
                 $expression = $operator;
                 $details = 'Operator tidak dikenal';
         }
-        
+
         $steps[] = [
             'step' => $currentStep,
             'expression' => $expression,
             'result' => $result ? 'True' : 'False',
             'details' => $details
         ];
-        
+
         return [$steps, $result];
     }
-    
+
     /**
      * Extract variables from AST
      */
     private function extractVariablesFromAST($ast)
     {
         $variables = [];
-        
+
         if ($ast['type'] === 'variable') {
             return [$ast['value']];
         }
-        
+
         foreach ($ast['operands'] as $operand) {
             $variables = array_merge($variables, $this->extractVariablesFromAST($operand));
         }
-        
+
         return array_unique($variables);
     }
-    
+
     /**
      * Count true results in table
      */
@@ -430,7 +460,7 @@ class TruthTableService
         }
         return $count;
     }
-    
+
     /**
      * Generate complete truth table with all basic operators for 2 variables
      */
@@ -439,10 +469,10 @@ class TruthTableService
         if (count($variables) != 2) {
             return ['error' => 'Complete table only available for 2 variables'];
         }
-        
+
         $p = $variables[0];
         $q = $variables[1];
-        
+
         $table = [];
         $combinations = [
             [true, true],
@@ -450,11 +480,11 @@ class TruthTableService
             [false, true],
             [false, false]
         ];
-        
+
         foreach ($combinations as $combination) {
             $pVal = $combination[0];
             $qVal = $combination[1];
-            
+
             $row = [
                 $p => $pVal,
                 $q => $qVal,
@@ -465,10 +495,10 @@ class TruthTableService
                 $p . ' ↔ ' . $q => $pVal === $qVal,
                 $p . ' ⊕ ' . $q => $pVal !== $qVal
             ];
-            
+
             $table[] = $row;
         }
-        
+
         return [
             'table' => $table,
             'headers' => [
@@ -482,14 +512,14 @@ class TruthTableService
             ]
         ];
     }
-    
+
     /**
      * Simplify expression (placeholder)
      */
     public function simplifyExpression($ast)
     {
         $original = $this->astToString($ast);
-        
+
         return [
             'original' => $original,
             'simplified' => $original,
@@ -497,7 +527,7 @@ class TruthTableService
             'cnf' => 'Tidak tersedia (fitur dalam pengembangan)'
         ];
     }
-    
+
     /**
      * Check if expression is tautology
      */
@@ -506,7 +536,7 @@ class TruthTableService
         $table = $this->generate($ast, $variables);
         return $table['is_tautology'];
     }
-    
+
     /**
      * Check if expression is contradiction
      */
